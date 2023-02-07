@@ -2,7 +2,7 @@ FROM apache/airflow:2.5.1
 USER root
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-         openjdk-11-jre-headless procps\
+         openjdk-11-jre-headless procps wget\
   && apt-get autoremove -yqq --purge \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*

@@ -1,2 +1,3 @@
 project_dir/logs/
 *.pyc
+venv/

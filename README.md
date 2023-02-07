@@ -4,6 +4,7 @@ Learning Airflow and building data pipelines
 
 ## Table of Contents <!-- omit in toc -->
 - [Setup Environment](#setup-environment)
+  - [Code completion](#code-completion)
   - [Airflow web server](#airflow-web-server)
   - [Cleaning-up the environment](#cleaning-up-the-environment)
 
@@ -15,6 +16,9 @@ This is completely done with docker containers. Refer official documentation [he
 
 Once downloaded, start the suite of containers with `docker-compose up --build`. Then access the airflow server at `localhost:8080`.
 
+### Code completion
+Setup a virtual python env to help your IDE with code completion
+- `pip install -r py_requirements.txt`
 ### Airflow web server
 Login to web server with credentials airflow/airflow, before you run any dag, set your spark connection
 - Then go to Admin > connections.
