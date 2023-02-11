@@ -29,4 +29,4 @@ Login to web server with credentials airflow/airflow, before you run any dag, se
   - extras: `{"queue":"root.default","spark_binary":"spark-submit","namespace":"default"}`
 
 ### Cleaning-up the environment
-Since we are in docker containers, simply run `docker compose down --volumes --remove-orphans`
+Since we are in docker containers, simply run `docker-compose down --volumes --remove-orphans`

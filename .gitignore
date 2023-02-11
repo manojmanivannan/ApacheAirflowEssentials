@@ -1,3 +1,4 @@
 project_dir/logs/
 *.pyc
 venv/
+*.csv
