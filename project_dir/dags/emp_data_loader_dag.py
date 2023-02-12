@@ -19,12 +19,13 @@ default_args = {
 }
 
 # pyspark_app_home=Variable("PYSPARK_APP_HOME")
-pyspark_app_home='/opt/airflow/spark' # because local path ./project_dir/spark is mounted to /opt/airflow/spark. Ref docker-compose.yaml
-postgres_url = "jdbc:postgresql://postgres/airflow"
-postgres_user = "airflow"
-postgres_pwd = "airflow"
-postgres_db = "mdm"
-postgres_table = "emp_records"
+pyspark_app_home    = "/opt/airflow/spark" # because local path ./project_dir/spark is mounted to /opt/airflow/spark. Ref docker-compose.yaml
+postgres_url        = "jdbc:postgresql://postgres/airflow"
+postgres_user       = "airflow"
+postgres_pwd        = "airflow"
+postgres_db         = "mdm"
+postgres_table      = "emp_records"
+jar_jdbc            = "/usr/local/share/postgresql-42.5.2.jar"
 
 # Create a DAG
 dag = DAG(dag_id='Employee_Data_Loader',
@@ -41,8 +42,8 @@ download_employee_data = BashOperator(task_id='get_employee_data',dag=dag, bash_
 load_employee_data= SparkSubmitOperator(task_id='load_employee_data',
     conn_id='spark_default',
     application=f'{pyspark_app_home}/load_employee_data.py',
-    jars='/opt/airflow/spark/postgresql-42.5.2.jar',
-    driver_class_path='/opt/airflow/spark/postgresql-42.5.2.jar',
+    jars=jar_jdbc,
+    driver_class_path=jar_jdbc,
     application_args=[postgres_url,postgres_user,postgres_pwd,postgres_db,postgres_table],
     total_executor_cores=2,
     executor_cores=1,
@@ -52,9 +53,9 @@ load_employee_data= SparkSubmitOperator(task_id='load_employee_data',
     execution_timeout=timedelta(minutes=10),
     dag=dag,
     conf={
-            "spark.master": "local[*]",
-            "spark.dynamicAllocation.enabled": "false",
-            "spark.shuffle.service.enabled": "false",
+            # "spark.master": "local[*]",
+            # "spark.dynamicAllocation.enabled": "false",
+            # "spark.shuffle.service.enabled": "false",
         },
 )
 
