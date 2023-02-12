@@ -7,6 +7,7 @@ Learning Airflow and building data pipelines
   - [Code completion](#code-completion)
   - [Airflow web server](#airflow-web-server)
   - [Cleaning-up the environment](#cleaning-up-the-environment)
+- [To-Do](#to-do)
 
 
 
@@ -30,3 +31,10 @@ Login to web server with credentials airflow/airflow, before you run any dag, se
 
 ### Cleaning-up the environment
 Since we are in docker containers, simply run `docker-compose down --volumes --remove-orphans`
+
+## To-Do
+- [x] Get a csv from a given url
+  - [ ] Use different csv in each run
+- [x] Load the csv into spark dataframe
+- [x] Load the dataframe data into postgres  
+- [ ] Create a schedule to run the dag at specific time

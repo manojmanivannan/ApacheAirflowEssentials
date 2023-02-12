@@ -1,25 +1,27 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.types import IntegerType, FloatType, DoubleType, TimestampType
 import psycopg2
+import sys
+
+# Parameters
+postgres_url = sys.argv[1]
+postgres_user = sys.argv[2]
+postgres_pwd = sys.argv[3]
+postgres_db = sys.argv[4]
+postgres_table = sys.argv[5]
 
 spark = SparkSession.builder.appName("Load Employee Data").getOrCreate()
 # spark.jars.append("/opt/airflow/spark/postgresql-42.5.2.jar")
 
 df = spark.read.options(header='True',delimiter=',',inferSchema='True').csv("/opt/airflow/spark/employee.csv")
 
-df.show(5)
 
 conn = psycopg2.connect(
     host="postgres",
-    database="airflow",
-    user="airflow",
-    password="airflow"
+    user=postgres_user,
+    password=postgres_pwd
 )
 cur = conn.cursor()
-
-# Create the database and table if they don't exist
-table_name = "data"
-
 
 # Get the schema of the DataFrame
 schema = df.schema
@@ -37,31 +39,30 @@ for field in schema:
     columns.append(f"{field.name} {data_type}")
 
 # create the schema
-cur.execute("CREATE SCHEMA IF NOT EXISTS airflow")
+print(f'Creating SCHEMA {postgres_db}')
+cur.execute(f"CREATE SCHEMA IF NOT EXISTS {postgres_db}")
 conn.commit()
 
 # Create the table
+print(f'Creating TABLE {postgres_db}.{postgres_table}')
 cur.execute(f"""
-    CREATE TABLE IF NOT EXISTS airflow.data (
+    CREATE TABLE IF NOT EXISTS {postgres_db}.{postgres_table} (
+        id SERIAL PRIMARY KEY,
+        date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         {", ".join(columns)}
     )
 """)
 conn.commit()
 
 
-mode = "overwrite"
-url = "jdbc:postgresql://postgres/airflow"
-properties = {"user": "airflow","password": "airflow"}
-df.write.jdbc(url=url, table="airflow.data", mode=mode, properties=properties)
-
 (
     df.write
     .format("jdbc")
-    .option("url", url)
-    .option("dbtable", "airflow.data")
-    .option("user", "airflow")
-    .option("password", "airflow")
-    .mode("overwrite")
+    .option("url", postgres_url)
+    .option("dbtable", f"{postgres_db}.{postgres_table}")
+    .option("user", postgres_user)
+    .option("password", postgres_pwd)
+    .mode("append") # explore different write methods
     .save()
 )
 
