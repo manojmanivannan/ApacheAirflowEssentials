@@ -52,11 +52,6 @@ load_employee_data= SparkSubmitOperator(task_id='load_employee_data',
     name='employee_data_getter',
     execution_timeout=timedelta(minutes=10),
     dag=dag,
-    conf={
-            # "spark.master": "local[*]",
-            # "spark.dynamicAllocation.enabled": "false",
-            # "spark.shuffle.service.enabled": "false",
-        },
 )
 
 download_employee_data >> load_employee_data
