@@ -1,0 +1,39 @@
+name: Docker Image CI
+
+on:
+  push:
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'  # Replace 'x' with the desired Python version
+
+      - name: Install Python packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt  # Replace with your requirements file
+
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install docker-compose -y
+
+      - name: Build and run Docker Compose
+        run: |
+          docker-compose up --build
+
+      - name: Verify
+        run: |
+          docker-compose run airflow-worker airflow dags trigger Employee_Data_Loader
+
+       - name: Destroy
+         run: |
+           docker-compose down --volumes --remove-orphans
