@@ -27,7 +27,7 @@ jobs:
           echo "Trigger Execution timestamp = $TRIGGER_EXECUTION_TIMESTAMP"
           docker-compose run airflow-worker airflow dags unpause Employee_Data_Loader
           sleep 30
-          docker-compose run airflow-worker airflow dags state Employee_Data_Loader ${{ env.TRIGGER_EXECUTION_TIMESTAMP }}
+          docker-compose run airflow-worker airflow dags state Employee_Data_Loader "$TRIGGER_EXECUTION_TIMESTAMP"
 
       - name: Destroy
         run: |
