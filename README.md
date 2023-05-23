@@ -22,8 +22,8 @@ Once downloaded, start the suite of containers with `docker-compose up --build`.
 Setup a virtual python env to help your IDE with code completion
 - `pip install -r py_requirements.txt`
 ### Airflow web server
-Login to web server with credentials airflow/airflow, before you run any dag, set your spark connection
-- Then go to Admin > connections.
+Login to web server (localhost:8080) with credentials airflow/airflow, before you run any dag, set your spark connection in case it is different from the default spark://local[*]
+- Go to Admin > connections.
   - Add a new connection
   - name: `spark_default`
   - connection Type: `Spark`

@@ -19,7 +19,7 @@ default_args = {
 }
 
 # pyspark_app_home=Variable("PYSPARK_APP_HOME")
-pyspark_app_home    = "/opt/airflow/spark" # because local path ./project_dir/spark is mounted to /opt/airflow/spark. Ref docker-compose.yaml
+pyspark_app_home    = "/opt/airflow/spark" # because local path ./src/spark is mounted to /opt/airflow/spark. Ref docker-compose.yaml
 postgres_url        = "jdbc:postgresql://postgres/airflow"
 postgres_user       = "airflow"
 postgres_pwd        = "airflow"
