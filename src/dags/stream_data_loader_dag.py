@@ -37,19 +37,11 @@ dag = DAG(dag_id='Stream_Employee_Data_Loader',
           catchup=False,
           schedule_interval=None)
 
-# get Kafka configuration information
-connection_config = {
-    "bootstrap.servers": kafka_bootstrap_servers
-    }
-
-
-def process_message(ti):
-    message = ti.value().decode('utf-8')
-    return message
-
-# def process_message(ti):
-#     data = context['task_instance'].xcom_pull(task_ids='consume_records')
-#     print(data)
+def process_message(ti, **context):
+    message = ti.xcom_pull(task_ids='consume_records', key='message')
+    # Process the message or perform any required transformations
+    processed_data = message.upper()
+    ti.xcom_push(key='processed_data', value=processed_data)
 
 
 def load_connections():
@@ -64,7 +56,7 @@ def load_connections():
             extra=json.dumps(
                 {
                     "bootstrap.servers": "localhost:9092",
-                    "group.id": "t2",
+                    "group.id": "kafka_connection",
                     "enable.auto.commit": False,
                     "auto.offset.reset": "beginning",
                 }
@@ -78,16 +70,16 @@ consume_task = ConsumeFromTopicOperator(
         kafka_config_id="kafka_connection",
         task_id='consume_records',
         topics=[kafka_topic],
-        apply_function=process_message, #'stream_data_loader_dag.process_message',
+        # apply_function=process_message, #'stream_data_loader_dag.process_message',
         dag=dag
     )
 
-# retrieve_data_task = PythonOperator(
-#         task_id='retrieve_data',
-#         python_callable=lambda: ti.xcom_pull(task_ids='Stream_Employee_Data_Loader.consume_records'),
-#         provide_context=True,
-#         dag=dag
-#     )
+retrieve_data_task = PythonOperator(
+        task_id='retrieve_data',
+        python_callable=process_message,
+        provide_context=True,
+        dag=dag
+    )
 
 def submit_spark_job(ti, **context):
     message = ti.xcom_pull(task_ids='consume_records',key="message")
@@ -102,9 +94,13 @@ def submit_spark_job(ti, **context):
             executor_memory='1g',
             driver_memory='1g',
             execution_timeout=timedelta(minutes=10),
+            conf={
+                'spark.executor.extraJavaOptions': f'-Ddata={message}',
+                'spark.driver.extraJavaOptions': f'-Ddata={message}'
+            },
             dag=dag)
-    
-    return spark_submit_task.execute(context=context)
+
+    return spark_submit_task #.execute(context=context)
 
 submit_task = PythonOperator(
     task_id='submit_task',
