@@ -9,6 +9,7 @@ postgres_user = sys.argv[2]
 postgres_pwd = sys.argv[3]
 postgres_db = sys.argv[4]
 postgres_table = sys.argv[5]
+message = sys.argv[6]
 
 spark = SparkSession.builder.appName("Load Employee Data").getOrCreate()
 # spark.jars.append("/opt/airflow/spark/postgresql-42.5.2.jar")

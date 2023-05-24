@@ -62,19 +62,19 @@ if __name__ == '__main__':
         kafka_producer.flush()
         kafka_producer.close()
 
-        # Create Kafka consumer
-        consumer = KafkaConsumer(
-            topic_name,
-            bootstrap_servers=bootstrap_servers,
-            group_id='my_consumer_group',
-            auto_offset_reset='earliest',
-            enable_auto_commit=False
-        )
+        # # Create Kafka consumer
+        # consumer = KafkaConsumer(
+        #     topic_name,
+        #     bootstrap_servers=bootstrap_servers,
+        #     group_id='my_consumer_group',
+        #     auto_offset_reset='earliest',
+        #     enable_auto_commit=False
+        # )
 
-        # Consume and print messages from the Kafka topic
-        for message in consumer:
-            logger.info(f'Received: {message.value.decode("utf-8")}')
+        # # Consume and print messages from the Kafka topic
+        # for message in consumer:
+        #     logger.info(f'Received: {message.value.decode("utf-8")}')
 
-        # Close Kafka consumer
-        consumer.close()
+        # # Close Kafka consumer
+        # consumer.close()
 

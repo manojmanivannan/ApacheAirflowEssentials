@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-import os
+import os, json
 import pendulum
 from airflow import DAG
 from airflow.operators.bash import BashOperator
@@ -37,41 +37,80 @@ dag = DAG(dag_id='Stream_Employee_Data_Loader',
           catchup=False,
           schedule_interval=None)
 
-
+# get Kafka configuration information
+connection_config = {
+    "bootstrap.servers": kafka_bootstrap_servers
+    }
 
 
 def process_message(ti):
-    message = ti.xcom_pull(key='message')
-    value = ti.value().decode('utf-8')
-    return value
+    message = ti.value().decode('utf-8')
+    return message
+
+# def process_message(ti):
+#     data = context['task_instance'].xcom_pull(task_ids='consume_records')
+#     print(data)
+
+
+def load_connections():
+    # Connections needed for this example dag to finish
+    from airflow.models import Connection
+    from airflow.utils import db
+
+    db.merge_conn(
+        Connection(
+            conn_id="kafka_connection",
+            conn_type="kafka",
+            extra=json.dumps(
+                {
+                    "bootstrap.servers": "localhost:9092",
+                    "group.id": "t2",
+                    "enable.auto.commit": False,
+                    "auto.offset.reset": "beginning",
+                }
+            ),
+        )
+    )
+
+establish_connection = PythonOperator(task_id="load_connections", python_callable=load_connections, dag=dag)
 
 consume_task = ConsumeFromTopicOperator(
+        kafka_config_id="kafka_connection",
         task_id='consume_records',
-        # bootstrap_servers=kafka_bootstrap_servers,
-        topics=kafka_topic,
+        topics=[kafka_topic],
         apply_function=process_message, #'stream_data_loader_dag.process_message',
         dag=dag
     )
 
-retrieve_data_task = PythonOperator(
-        task_id='retrieve_data',
-        python_callable=lambda: ti.xcom_pull(task_ids='Stream_Employee_Data_Loader.consume_records'),
-        provide_context=True,
-        dag=dag
-    )
+# retrieve_data_task = PythonOperator(
+#         task_id='retrieve_data',
+#         python_callable=lambda: ti.xcom_pull(task_ids='Stream_Employee_Data_Loader.consume_records'),
+#         provide_context=True,
+#         dag=dag
+#     )
 
-spark_submit_task = SparkSubmitOperator(
-        task_id='submit_spark_job',
-        application=f'{pyspark_app_home}/stream_load_data.py',
-        jars=jar_jdbc,
-        driver_class_path=jar_jdbc,
-        application_args=[postgres_url,postgres_user,postgres_pwd,postgres_db,postgres_table],
-        total_executor_cores=2,
-        executor_cores=1,
-        executor_memory='1g',
-        driver_memory='1g',
-        conf={'data': '{{ task_instance.xcom_pull(task_ids="retrieve_data") }}'},
-        execution_timeout=timedelta(minutes=10),
-        dag=dag)
+def submit_spark_job(ti, **context):
+    message = ti.xcom_pull(task_ids='consume_records',key="message")
+    spark_submit_task = SparkSubmitOperator(
+            task_id='submit_spark_job',
+            application=f'{pyspark_app_home}/stream_load_data.py',
+            jars=jar_jdbc,
+            driver_class_path=jar_jdbc,
+            application_args=[postgres_url,postgres_user,postgres_pwd,postgres_db,postgres_table,message],
+            total_executor_cores=2,
+            executor_cores=1,
+            executor_memory='1g',
+            driver_memory='1g',
+            execution_timeout=timedelta(minutes=10),
+            dag=dag)
+    
+    return spark_submit_task.execute(context=context)
 
-consume_task >> retrieve_data_task >> spark_submit_task
+submit_task = PythonOperator(
+    task_id='submit_task',
+    python_callable=submit_spark_job,
+    provide_context=True,
+    dag=dag
+)
+
+establish_connection >> consume_task  >> submit_task
