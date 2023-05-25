@@ -1,7 +1,11 @@
 from pyspark.sql import SparkSession
+from pyspark import SparkContext, SparkConf
 from pyspark.sql.types import IntegerType, FloatType, DoubleType, TimestampType
+from pyspark.sql import Row
 import psycopg2
 import sys
+
+
 
 # Parameters
 postgres_url = sys.argv[1]
@@ -13,10 +17,18 @@ message = sys.argv[6]
 
 spark = SparkSession.builder.appName("Load Employee Data").getOrCreate()
 # spark.jars.append("/opt/airflow/spark/postgresql-42.5.2.jar")
+sc = spark.sparkContext
 
-data = spark.conf.get('data')
+csvData = sc.parallelize([message])
+df = csvData\
+            .map(lambda x: x.split(";"))\
+            .map(lambda x: Row(x[0],\
+                               x[1],\
+                               x[2],\
+                               x[3]))\
+.toDF(["Name", "Address", "Phone", "Email"])
 
-df = spark.read.csv(data, header=False)
+
 
 conn = psycopg2.connect(
     host="postgres",

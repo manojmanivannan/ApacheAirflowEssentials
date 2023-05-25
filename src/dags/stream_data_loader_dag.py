@@ -7,6 +7,7 @@ from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 from airflow_provider_kafka.operators.consume_from_topic import ConsumeFromTopicOperator
+from airflow_provider_kafka.operators.await_message import AwaitKafkaMessageOperator
 from airflow.contrib.operators.spark_submit_operator import SparkSubmitOperator
 import functools
 
@@ -76,10 +77,8 @@ def consumer_function(messages, prefix=None):
     consumer_logger.info("starting consumer function")
     consumer_logger.info(f"Messages {messages}")
     for message in messages:
-        key = json.loads(message.key())
-        value = json.loads(message.value())
         consumer_logger.info(
-            f"{prefix} {message.topic()} @ {message.offset()}; {key} : {value}"
+            f"{prefix} {message.topic()} @ {message.offset()}; Message {message.value().decode('utf-8')}"
         )
     return
     
@@ -92,7 +91,7 @@ consume_task = ConsumeFromTopicOperator(
             consumer_function, prefix="consumed:::"
         ),
         consumer_config={
-            "bootstrap.servers": "localhost:9092",
+            "bootstrap.servers": "kafka:9092",
             "group.id": "kafka_connection",
             "enable.auto.commit": False,
             "auto.offset.reset": "beginning",
@@ -111,28 +110,47 @@ consume_task = ConsumeFromTopicOperator(
 #         dag=dag
 #     )
 
-# def submit_spark_job(ti, **context):
-    # message = ti.xcom_pull(task_ids='consume_records',key="message")
-spark_submit_task = SparkSubmitOperator(
-        task_id='submit_spark_job',
-        application=f'{pyspark_app_home}/stream_load_data.py',
-        jars=jar_jdbc,
-        driver_class_path=jar_jdbc,
-        application_args=[postgres_url,postgres_user,postgres_pwd,postgres_db,postgres_table],
-        total_executor_cores=2,
-        executor_cores=1,
-        executor_memory='1g',
-        driver_memory='1g',
-        execution_timeout=timedelta(minutes=10),
-        dag=dag)
+def submit_spark_job(ti, **context):
+    message = ti.xcom_pull(task_ids='awaiting_message',key="retrieved_message")
+    consumer_logger.info(f"Spark submit XCOM {message}")
+    spark_submit_task = SparkSubmitOperator(
+            task_id='submit_spark_job',
+            application=f'{pyspark_app_home}/stream_load_data.py',
+            jars=jar_jdbc,
+            driver_class_path=jar_jdbc,
+            application_args=[postgres_url,postgres_user,postgres_pwd,postgres_db,postgres_table,message],
+            total_executor_cores=2,
+            executor_cores=1,
+            executor_memory='1g',
+            driver_memory='1g',
+            execution_timeout=timedelta(minutes=10),
+            dag=dag)
 
-    # return spark_submit_task.execute(context=context)
+    return spark_submit_task.execute(context=context)
 
-# submit_task = PythonOperator(
-#     task_id='submit_task',
-#     python_callable=submit_spark_job,
-#     provide_context=True,
-#     dag=dag
-# )
+submit_task = PythonOperator(
+    task_id='submit_task',
+    python_callable=submit_spark_job,
+    provide_context=True,
+    dag=dag
+)
+def consumer_await_function(message):
+    consumer_logger.info(message.value())
+    return f"{message.value().decode('utf-8')}"
 
-consume_task  >> spark_submit_task
+t5 = AwaitKafkaMessageOperator(
+    task_id="awaiting_message",
+    topics=[kafka_topic],
+    apply_function="stream_data_loader_dag.consumer_await_function",
+    kafka_config={
+            "bootstrap.servers": "kafka:9092",
+            "group.id": "awaiting_message",
+            "enable.auto.commit": False,
+            "auto.offset.reset": "beginning",
+        },
+    xcom_push_key="retrieved_message",
+    dag=dag
+)
+
+
+consume_task  >> t5 >> submit_task    #spark_submit_task
