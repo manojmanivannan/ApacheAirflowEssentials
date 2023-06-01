@@ -66,13 +66,8 @@ def read_from_kafka():
             progress_file.write(str(message.offset))
 
 def process_csv_record(record):
-    # Assuming the CSV record has two columns: 'name' and 'age'
     # Extract the values from the record
     name, address, phone, email = record.split(';')
-    
-    # Perform a simple transformation
-    # name = name.strip()  # Remove leading/trailing whitespace
-    # ad = int(age)  # Convert age to an integer
     
     # Write the transformed values to a file
     with open(pyspark_app_home+'/transformed_data.txt', 'a') as file:
