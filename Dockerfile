@@ -9,5 +9,5 @@ RUN apt-get update \
 RUN wget -O /usr/local/share/postgresql-42.5.2.jar https://jdbc.postgresql.org/download/postgresql-42.5.2.jar
 USER airflow
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-COPY requirements.txt /tmp/requirements.txt
+COPY py_requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt

@@ -2,3 +2,5 @@ src/logs/
 *.pyc
 venv/
 *.csv
+src/spark/progress.txt
+src/spark/transformed_data.txt
