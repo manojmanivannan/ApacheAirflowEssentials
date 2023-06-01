@@ -13,13 +13,14 @@ postgres_user = sys.argv[2]
 postgres_pwd = sys.argv[3]
 postgres_db = sys.argv[4]
 postgres_table = sys.argv[5]
-message = sys.argv[6]
+target_file = sys.argv[6]
+
 
 spark = SparkSession.builder.appName("Load Employee Data").getOrCreate()
 # spark.jars.append("/opt/airflow/spark/postgresql-42.5.2.jar")
 sc = spark.sparkContext
 
-csvData = sc.parallelize([message])
+csvData = sc.textFile(target_file)
 df = csvData\
             .map(lambda x: x.split(";"))\
             .map(lambda x: Row(x[0],\
@@ -83,3 +84,7 @@ conn.commit()
 spark.stop()
 cur.close()
 conn.close()
+
+# Flush the target file
+open(target_file,'w').close()
+

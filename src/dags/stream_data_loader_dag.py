@@ -1,22 +1,18 @@
 from datetime import datetime, timedelta
-import os, json
-import pendulum
+#import pendulum
 import logging
 from airflow import DAG
-from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
-from airflow.models import Variable
-from airflow_provider_kafka.operators.consume_from_topic import ConsumeFromTopicOperator
-from airflow_provider_kafka.operators.await_message import AwaitKafkaMessageOperator
+from kafka import KafkaConsumer
 from airflow.contrib.operators.spark_submit_operator import SparkSubmitOperator
-import functools
+
 
 consumer_logger = logging.getLogger("airflow")
-local_tz = pendulum.timezone("Etc/UTC")
+# local_tz = pendulum.timezone("Etc/UTC")
 default_args = {
     'owner': 'manoj',
     'depends_on_past': False,
-    'start_date': datetime(2020, 10, 10, tzinfo=local_tz),
+    'start_date': datetime(2023, 6, 1), # tzinfo=local_tz),
     # 'email': ['example@example.com'],
     # 'email_on_failure': True,
     # 'email_on_retry': True,
@@ -32,125 +28,83 @@ postgres_pwd        = "airflow"
 postgres_db         = "mdm"
 postgres_table      = "emp_records"
 jar_jdbc            = "/usr/local/share/postgresql-42.5.2.jar"
-kafka_bootstrap_servers = 'localhost:9092'
+kafka_bootstrap_servers = 'kafka:9092'
 kafka_topic = 'transactions'
 
-# Create a DAG
-dag = DAG(dag_id='Stream_Employee_Data_Loader',
-          default_args=default_args,
-          catchup=False,
-          schedule_interval=None)
-
-def process_message(ti, **context):
-    message = ti.xcom_pull(task_ids='consume_records', key='message')
-    # Process the message or perform any required transformations
-    print(message)
-    processed_data = message.upper()
-    
-    ti.xcom_push(key='processed_data', value=processed_data)
-
-connection_config = {
-    "bootstrap.servers": "localhost:9092",
-}
-
-def load_connections():
-    # Connections needed for this example dag to finish
-    from airflow.models import Connection
-    from airflow.utils import db
-
-    db.merge_conn(
-        Connection(
-            conn_id="kafka_connection",
-            conn_type="kafka",
-            extra=json.dumps(
-                {
-                    "bootstrap.servers": "localhost:9092",
-                    "group.id": "kafka_connection",
-                    "enable.auto.commit": False,
-                    "auto.offset.reset": "beginning",
-                }
-            ),
-        )
+def read_from_kafka():
+    consumer = KafkaConsumer(
+        kafka_topic,
+        bootstrap_servers=kafka_bootstrap_servers,
+        group_id='kafka_connection',
+        value_deserializer=lambda x: x.decode('utf-8'),
+        auto_offset_reset='latest',
+        enable_auto_commit=True,
     )
-
-def consumer_function(messages, prefix=None):
-    consumer_logger.info("starting consumer function")
-    consumer_logger.info(f"Messages {messages}")
-    for message in messages:
-        consumer_logger.info(
-            f"{prefix} {message.topic()} @ {message.offset()}; Message {message.value().decode('utf-8')}"
-        )
-    return
     
-#establish_connection = PythonOperator(task_id="load_connections", python_callable=load_connections, dag=dag)
+    with open(pyspark_app_home+'/progress.txt', 'r') as progress_file:
+        progress = int(progress_file.read().strip())
+    
+    record_count=0
 
-consume_task = ConsumeFromTopicOperator(
-        task_id='consume_records',
-        topics=[kafka_topic],
-        apply_function_batch=functools.partial(
-            consumer_function, prefix="consumed:::"
-        ),
-        consumer_config={
-            "bootstrap.servers": "kafka:9092",
-            "group.id": "kafka_connection",
-            "enable.auto.commit": False,
-            "auto.offset.reset": "beginning",
-        },
-        commit_cadence="end_of_batch",
-        max_messages=10,
-        max_batch_size=2,
-        dag=dag
+    for message in consumer:
+        if record_count >= 10: 
+            consumer_logger.info(f'Read 10 records, breaking !')
+            break
+
+        if message.offset <= progress: 
+            continue
+
+        consumer_logger.info(f'Record {record_count}: {message.value}')
+        
+        # Process each message (CSV record) as needed
+        process_csv_record(message.value)
+        record_count+=1
+        
+        
+        # Update the progress in the progress file
+        with open(pyspark_app_home+'/progress.txt', 'w') as progress_file:
+            progress_file.write(str(message.offset))
+
+def process_csv_record(record):
+    # Assuming the CSV record has two columns: 'name' and 'age'
+    # Extract the values from the record
+    name, address, phone, email = record.split(';')
+    
+    # Perform a simple transformation
+    # name = name.strip()  # Remove leading/trailing whitespace
+    # ad = int(age)  # Convert age to an integer
+    
+    # Write the transformed values to a file
+    with open(pyspark_app_home+'/transformed_data.txt', 'a') as file:
+        file.write(f'{name};{address};{phone};{email}\n')
+
+# STEP 2 #### Load the csv into database
+
+
+with DAG('Stream_Employee_Data_Loader',
+         default_args=default_args,
+         schedule_interval='*/3 * * * *') as dag:
+        #  schedule_interval=None) as dag:
+    
+    read_kafka_task = PythonOperator(
+        task_id='read_kafka',
+        python_callable=read_from_kafka
     )
-
-# retrieve_data_task = PythonOperator(
-#         task_id='retrieve_data',
-#         python_callable=process_message,
-#         provide_context=True,
-#         do_xcom_push=True,
-#         dag=dag
-#     )
-
-def submit_spark_job(ti, **context):
-    message = ti.xcom_pull(task_ids='awaiting_message',key="retrieved_message")
-    consumer_logger.info(f"Spark submit XCOM {message}")
-    spark_submit_task = SparkSubmitOperator(
-            task_id='submit_spark_job',
-            application=f'{pyspark_app_home}/stream_load_data.py',
-            jars=jar_jdbc,
-            driver_class_path=jar_jdbc,
-            application_args=[postgres_url,postgres_user,postgres_pwd,postgres_db,postgres_table,message],
-            total_executor_cores=2,
-            executor_cores=1,
-            executor_memory='1g',
-            driver_memory='1g',
-            execution_timeout=timedelta(minutes=10),
-            dag=dag)
-
-    return spark_submit_task.execute(context=context)
-
-submit_task = PythonOperator(
-    task_id='submit_task',
-    python_callable=submit_spark_job,
-    provide_context=True,
-    dag=dag
-)
-def consumer_await_function(message):
-    consumer_logger.info(message.value())
-    return f"{message.value().decode('utf-8')}"
-
-t5 = AwaitKafkaMessageOperator(
-    task_id="awaiting_message",
-    topics=[kafka_topic],
-    apply_function="stream_data_loader_dag.consumer_await_function",
-    kafka_config={
-            "bootstrap.servers": "kafka:9092",
-            "group.id": "awaiting_message",
-            "enable.auto.commit": False,
-            "auto.offset.reset": "beginning",
-        },
-    xcom_push_key="retrieved_message",
-    dag=dag
-)
-
-
-consume_task  >> t5 >> submit_task    #spark_submit_task
+    
+    
+    load_employee_data = SparkSubmitOperator(task_id='load_employee_data',
+        conn_id='spark_default',
+        application=f'{pyspark_app_home}/stream_load_data.py',
+        jars=jar_jdbc,
+        driver_class_path=jar_jdbc,
+        application_args=[postgres_url,postgres_user,postgres_pwd,postgres_db,postgres_table,pyspark_app_home+'/transformed_data.txt'],
+        total_executor_cores=2,
+        executor_cores=1,
+        executor_memory='1g',
+        driver_memory='1g',
+        name='employee_data_getter',
+        execution_timeout=timedelta(minutes=2),
+    )
+    
+    # Define task dependencies
+    read_kafka_task >> load_employee_data

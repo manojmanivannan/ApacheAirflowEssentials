@@ -60,7 +60,7 @@ Since we are in docker containers, simply run `docker-compose down --volumes --r
 
 ## To-Do
 - [x] Get a csv from a given url
-  - [ ] Use different csv in each run (try using continuous data)
+  - [x] Use different csv in each run (try using continuous data)
 - [x] Load the csv into spark dataframe
 - [x] Load the dataframe data into postgres  
-- [ ] Create a schedule to run the dag at specific time
+- [x] Create a schedule to run the dag at specific time/interval
