@@ -4,7 +4,7 @@ from pyspark.sql.types import IntegerType, FloatType, DoubleType, TimestampType
 from pyspark.sql import Row
 import psycopg2
 import sys
-
+from logger.job_logger import logger
 
 
 # Parameters
@@ -30,7 +30,7 @@ df = csvData\
 .toDF(["Name", "Address", "Phone", "Email"])
 
 
-
+logger.info('Connecting to postgres DB')
 conn = psycopg2.connect(
     host="postgres",
     user=postgres_user,
@@ -54,12 +54,12 @@ for field in schema:
     columns.append(f"{field.name} {data_type}")
 
 # create the schema
-print(f'Creating SCHEMA {postgres_db}')
+logger.info(f'Creating SCHEMA {postgres_db}')
 cur.execute(f"CREATE SCHEMA IF NOT EXISTS {postgres_db}")
 conn.commit()
 
 # Create the table
-print(f'Creating TABLE {postgres_db}.{postgres_table}')
+logger.info(f'Creating TABLE {postgres_db}.{postgres_table}')
 cur.execute(f"""
     CREATE TABLE IF NOT EXISTS {postgres_db}.{postgres_table} (
         id SERIAL PRIMARY KEY,

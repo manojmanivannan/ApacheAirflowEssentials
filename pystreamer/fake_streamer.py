@@ -23,7 +23,7 @@ def publish_message(producer_instance, topic_name, key, value):
         value_bytes = bytes(value, encoding='utf-8')
         producer_instance.send(topic_name, key=key_bytes, value=value_bytes)
         producer_instance.flush()
-        logger.info(f'Message published successfully: {value}')
+        logger.info(f'Streamed: {value}')
     except Exception as ex:
         logger.error('Exception in publishing message')
         logger.error(str(ex))
@@ -44,21 +44,19 @@ if __name__ == '__main__':
 
     kafka_producer = connect_kafka_producer()
     fake = Faker()
-    for i in range(10):
-        sleep(5)
-        logger.info('streaming')
-        data = {
-            'Name': fake.name(),
-            'Address': fake.address().replace('\n', ' '),
-            'Phone': fake.phone_number(),
-            'Email': fake.email()
-        }
-        publish_message(kafka_producer, topic_name, 'raw', ';'.join(data.values()))
-        # kafka_producer.send(topic_name, value=data.encode('utf-8'))
-
-
-    if kafka_producer is not None:
-        # Flush & Close Kafka producer
+    try:
+        while True:
+            sleep(3)
+            data = {
+                'Name': fake.name(),
+                'Address': fake.address().replace('\n', ' '),
+                'Phone': fake.phone_number(),
+                'Email': fake.email()
+            }
+            publish_message(kafka_producer, topic_name, 'raw', ';'.join(data.values()))
+    except:
+        pass
+    finally:
         kafka_producer.flush()
         kafka_producer.close()
 
