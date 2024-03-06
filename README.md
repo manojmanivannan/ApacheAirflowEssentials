@@ -10,8 +10,6 @@ Learning Airflow and building data pipelines
   - [Cleaning-up the environment](#cleaning-up-the-environment)
 - [To-Do](#to-do)
 
-
-
 ## Setup Environment
 
 This is completely done with docker containers. Refer official documentation [here](https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html). From here you can get the `docker-compose.yaml` file which is also in this repository with a slight modification of the image. I use a custom image from `Dockerfile`. In this image, I'm install the python dependencies and also postgres driver (JAR file) so the dags can communicate and write the data into the DB.
